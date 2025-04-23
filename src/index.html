@@ -1,0 +1,895 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blockchain Explorer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .blockchain-visualization {
+            display: flex;
+            overflow-x: auto;
+            padding: 2rem 0;
+            scrollbar-width: thin;
+            scrollbar-color: #4F46E5 #E5E7EB;
+        }
+        
+        .blockchain-visualization::-webkit-scrollbar {
+            height: 8px;
+        }
+        
+        .blockchain-visualization::-webkit-scrollbar-track {
+            background: #E5E7EB;
+            border-radius: 10px;
+        }
+        
+        .blockchain-visualization::-webkit-scrollbar-thumb {
+            background-color: #4F46E5;
+            border-radius: 10px;
+        }
+        
+        .block {
+            min-width: 300px;
+            transition: all 0.3s ease;
+        }
+        
+        .block:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        
+        .connector {
+            width: 50px;
+            height: 2px;
+            background-color: #4F46E5;
+            margin: 0 10px;
+            align-self: center;
+            position: relative;
+        }
+        
+        .connector::after {
+            content: '';
+            position: absolute;
+            right: 0;
+            top: -4px;
+            width: 0;
+            height: 0;
+            border-top: 5px solid transparent;
+            border-bottom: 5px solid transparent;
+            border-left: 10px solid #4F46E5;
+        }
+        
+        .transaction {
+            transition: all 0.2s ease;
+        }
+        
+        .transaction:hover {
+            background-color: #F3F4F6;
+        }
+        
+        .node-badge {
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(79, 70, 229, 0.4);
+            }
+            70% {
+                box-shadow: 0 0 0 10px rgba(79, 70, 229, 0);
+            }
+            100% {
+                box-shadow: 0 0 0 0 rgba(79, 70, 229, 0);
+            }
+        }
+        
+        .code-block {
+            font-family: 'Courier New', monospace;
+            background-color: #1E293B;
+            color: #E2E8F0;
+            border-radius: 0.5rem;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <header class="bg-indigo-600 text-white shadow-lg">
+        <div class="container mx-auto px-4 py-6">
+            <div class="flex justify-between items-center">
+                <div class="flex items-center space-x-2">
+                    <i class="fas fa-link text-2xl"></i>
+                    <h1 class="text-2xl font-bold">Blockchain Explorer</h1>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <span id="nodeId" class="bg-indigo-500 px-3 py-1 rounded-full text-sm font-medium">Node: Loading...</span>
+                    <button id="mineBtn" class="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg font-medium transition-colors">
+                        <i class="fas fa-hammer mr-2"></i> Mine Block
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="container mx-auto px-4 py-8">
+        <section class="mb-12">
+            <h2 class="text-3xl font-bold text-gray-800 mb-6">How This Blockchain Works</h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <div class="flex items-center mb-4">
+                        <div class="bg-indigo-100 p-3 rounded-full mr-4">
+                            <i class="fas fa-cube text-indigo-600 text-xl"></i>
+                        </div>
+                        <h3 class="text-xl font-semibold text-gray-800">Block Structure</h3>
+                    </div>
+                    <p class="text-gray-600">Each block contains an index, timestamp, list of transactions, proof of work, and the hash of the previous block. This creates an immutable chain.</p>
+                </div>
+                
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <div class="flex items-center mb-4">
+                        <div class="bg-green-100 p-3 rounded-full mr-4">
+                            <i class="fas fa-exchange-alt text-green-600 text-xl"></i>
+                        </div>
+                        <h3 class="text-xl font-semibold text-gray-800">Transactions</h3>
+                    </div>
+                    <p class="text-gray-600">Transactions are added to a pool and included in the next mined block. Each transaction has a sender, recipient, and amount.</p>
+                </div>
+                
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <div class="flex items-center mb-4">
+                        <div class="bg-yellow-100 p-3 rounded-full mr-4">
+                            <i class="fas fa-lock text-yellow-600 text-xl"></i>
+                        </div>
+                        <h3 class="text-xl font-semibold text-gray-800">Proof of Work</h3>
+                    </div>
+                    <p class="text-gray-600">Miners must find a number that when hashed with the previous proof, produces a hash with 4 leading zeros. This secures the network.</p>
+                </div>
+            </div>
+            
+            <div class="bg-white p-6 rounded-lg shadow-md mb-8">
+                <h3 class="text-xl font-semibold text-gray-800 mb-4">Key Code Components</h3>
+                <div class="code-block p-4 mb-4">
+                    <pre>class Blockchain:
+    def __init__(self):
+        self.chain = []
+        self.current_transactions = []
+        self.nodes = set()
+        self.new_block(previous_hash=1, proof=100)  # Genesis block</pre>
+                </div>
+                <p class="text-gray-600 mb-4">The blockchain is initialized with an empty chain, empty transaction pool, and empty node set. The genesis block is created immediately.</p>
+                
+                <div class="code-block p-4 mb-4">
+                    <pre>def new_block(self, proof, previous_hash=None):
+    block = {
+        'index': len(self.chain) + 1,
+        'timestamp': time(),
+        'transactions': self.current_transactions,
+        'proof': proof,
+        'previous_hash': previous_hash or self.hash(self.chain[-1]),
+    }
+    self.current_transactions = []
+    self.chain.append(block)
+    return block</pre>
+                </div>
+                <p class="text-gray-600 mb-4">New blocks are created with the current transactions, a proof of work, and a link to the previous block's hash.</p>
+                
+                <div class="code-block p-4">
+                    <pre>def proof_of_work(self, last_proof):
+    proof = 0
+    while self.valid_proof(last_proof, proof) is False:
+        proof += 1
+    return proof
+
+@staticmethod
+def valid_proof(last_proof, proof):
+    guess = f'{last_proof}{proof}'.encode()
+    guess_hash = hashlib.sha256(guess).hexdigest()
+    return guess_hash[:4] == "0000"</pre>
+                </div>
+                <p class="text-gray-600 mt-4">The proof of work algorithm finds a number that when combined with the previous proof and hashed, produces a hash with 4 leading zeros.</p>
+            </div>
+        </section>
+        
+        <section class="mb-12">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-3xl font-bold text-gray-800">Blockchain Visualization</h2>
+                <button id="resolveChainBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-colors">
+                    <i class="fas fa-sync-alt mr-2"></i> Resolve Chain
+                </button>
+            </div>
+            
+            <div id="blockchainContainer" class="blockchain-visualization">
+                <!-- Blocks will be inserted here by JavaScript -->
+            </div>
+        </section>
+        
+        <section class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
+            <div class="bg-white p-6 rounded-lg shadow-md">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-semibold text-gray-800">Create Transaction</h3>
+                    <span class="bg-indigo-100 text-indigo-800 text-xs font-medium px-2.5 py-0.5 rounded">POST /transactions/new</span>
+                </div>
+                
+                <form id="transactionForm" class="space-y-4">
+                    <div>
+                        <label for="sender" class="block text-sm font-medium text-gray-700 mb-1">Sender</label>
+                        <input type="text" id="sender" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500" placeholder="Sender's address">
+                    </div>
+                    
+                    <div>
+                        <label for="recipient" class="block text-sm font-medium text-gray-700 mb-1">Recipient</label>
+                        <input type="text" id="recipient" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500" placeholder="Recipient's address">
+                    </div>
+                    
+                    <div>
+                        <label for="amount" class="block text-sm font-medium text-gray-700 mb-1">Amount</label>
+                        <input type="number" id="amount" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500" placeholder="Amount to send">
+                    </div>
+                    
+                    <button type="submit" class="w-full bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition-colors">
+                        <i class="fas fa-paper-plane mr-2"></i> Send Transaction
+                    </button>
+                </form>
+            </div>
+            
+            <div class="bg-white p-6 rounded-lg shadow-md">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-semibold text-gray-800">Register Node</h3>
+                    <span class="bg-indigo-100 text-indigo-800 text-xs font-medium px-2.5 py-0.5 rounded">POST /nodes/register</span>
+                </div>
+                
+                <form id="nodeForm" class="space-y-4">
+                    <div>
+                        <label for="nodeUrl" class="block text-sm font-medium text-gray-700 mb-1">Node URL</label>
+                        <input type="text" id="nodeUrl" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500" placeholder="http://node.example.com:5000">
+                    </div>
+                    
+                    <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors">
+                        <i class="fas fa-server mr-2"></i> Register Node
+                    </button>
+                </form>
+                
+                <div class="mt-6">
+                    <h4 class="text-lg font-medium text-gray-800 mb-2">Network Nodes</h4>
+                    <div id="nodesList" class="space-y-2">
+                        <!-- Nodes will be listed here -->
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <section class="bg-white p-6 rounded-lg shadow-md">
+            <h2 class="text-3xl font-bold text-gray-800 mb-6">API Documentation</h2>
+            
+            <div class="space-y-6">
+                <div class="border-l-4 border-indigo-500 pl-4">
+                    <h3 class="text-xl font-semibold text-gray-800">GET /mine</h3>
+                    <p class="text-gray-600 mt-1">Mines a new block by finding a valid proof of work. The miner (node) receives 1 coin as reward.</p>
+                    <div class="mt-2">
+                        <span class="inline-block bg-green-100 text-green-800 text-xs font-medium px-2.5 py-0.5 rounded">Success Response</span>
+                        <div class="code-block p-3 mt-2 text-sm">
+                            <pre>{
+  "message": "New Block Forged",
+  "index": 2,
+  "transactions": [...],
+  "proof": 35293,
+  "previous_hash": "..."
+}</pre>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="border-l-4 border-indigo-500 pl-4">
+                    <h3 class="text-xl font-semibold text-gray-800">POST /transactions/new</h3>
+                    <p class="text-gray-600 mt-1">Creates a new transaction to be included in the next mined block.</p>
+                    <div class="mt-2">
+                        <span class="inline-block bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded">Request Body</span>
+                        <div class="code-block p-3 mt-2 text-sm">
+                            <pre>{
+  "sender": "sender_address",
+  "recipient": "recipient_address",
+  "amount": 5
+}</pre>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="border-l-4 border-indigo-500 pl-4">
+                    <h3 class="text-xl font-semibold text-gray-800">GET /chain</h3>
+                    <p class="text-gray-600 mt-1">Returns the full blockchain with all blocks and transactions.</p>
+                </div>
+                
+                <div class="border-l-4 border-indigo-500 pl-4">
+                    <h3 class="text-xl font-semibold text-gray-800">POST /nodes/register</h3>
+                    <p class="text-gray-600 mt-1">Registers a new node in the network.</p>
+                    <div class="mt-2">
+                        <span class="inline-block bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded">Request Body</span>
+                        <div class="code-block p-3 mt-2 text-sm">
+                            <pre>{
+  "nodes": ["http://node1.example.com:5000"]
+}</pre>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="border-l-4 border-indigo-500 pl-4">
+                    <h3 class="text-xl font-semibold text-gray-800">GET /nodes/resolve</h3>
+                    <p class="text-gray-600 mt-1">Implements the consensus algorithm, resolving any conflicts by replacing the chain with the longest valid chain in the network.</p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="bg-gray-800 text-white py-8">
+        <div class="container mx-auto px-4">
+            <div class="flex flex-col md:flex-row justify-between items-center">
+                <div class="mb-4 md:mb-0">
+                    <h3 class="text-xl font-bold mb-2">Blockchain Explorer</h3>
+                    <p class="text-gray-400">A simple Python blockchain implementation with Flask</p>
+                </div>
+                <div class="flex space-x-4">
+                    <a href="#" class="text-gray-400 hover:text-white transition-colors">
+                        <i class="fab fa-github text-xl"></i>
+                    </a>
+                    <a href="#" class="text-gray-400 hover:text-white transition-colors">
+                        <i class="fab fa-twitter text-xl"></i>
+                    </a>
+                    <a href="#" class="text-gray-400 hover:text-white transition-colors">
+                        <i class="fab fa-linkedin text-xl"></i>
+                    </a>
+                </div>
+            </div>
+            <div class="border-t border-gray-700 mt-6 pt-6 text-center text-gray-400 text-sm">
+                <p>© 2023 Blockchain Explorer. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Add this to the beginning of your script section
+        const API_URL = 'http://localhost:5000'; // Change this to your server address if different
+
+        document.addEventListener('DOMContentLoaded', function() {
+            // Fetch node ID from the server
+            fetch(`${API_URL}/node_id`)
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('nodeId').textContent = `Node: ${data.node_id}`;
+                })
+                .catch(error => {
+                    console.error('Error fetching node ID:', error);
+                    document.getElementById('nodeId').textContent = 'Node: Disconnected';
+                });
+            
+            // Load actual blockchain data
+            loadBlockchain();
+            loadNodes();
+            
+            // Set up event listeners
+            document.getElementById('mineBtn').addEventListener('click', mineBlock);
+            document.getElementById('resolveChainBtn').addEventListener('click', resolveChain);
+            document.getElementById('transactionForm').addEventListener('submit', createTransaction);
+            document.getElementById('nodeForm').addEventListener('submit', registerNode);
+        });
+
+        function loadBlockchain() {
+            const blockchainContainer = document.getElementById('blockchainContainer');
+            blockchainContainer.innerHTML = '<div class="flex justify-center w-full"><div class="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500"></div></div>';
+            
+            fetch(`${API_URL}/chain`)
+                .then(response => response.json())
+                .then(data => {
+                    blockchainContainer.innerHTML = '';
+                    
+                    // Create blocks
+                    data.chain.forEach(block => {
+                        const blockElement = createBlockElement(block);
+                        blockchainContainer.appendChild(blockElement);
+                        
+                        // Add connector between blocks (except after last block)
+                        if (block.index < data.chain.length) {
+                            const connector = document.createElement('div');
+                            connector.className = 'connector';
+                            blockchainContainer.appendChild(connector);
+                        }
+                    });
+                })
+                .catch(error => {
+                    console.error('Error loading blockchain:', error);
+                    blockchainContainer.innerHTML = '<div class="text-red-500">Failed to load blockchain data. Please check your connection.</div>';
+                });
+        }
+
+        function loadNodes() {
+            const nodesList = document.getElementById('nodesList');
+            nodesList.innerHTML = '<div class="text-sm text-gray-500">Loading nodes...</div>';
+            
+            fetch(`${API_URL}/nodes/register`, { method: 'GET' })
+                .then(response => {
+                    if (!response.ok && response.status !== 405) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.total_nodes && data.total_nodes.length > 0) {
+                        displayNodes(data.total_nodes);
+                    } else {
+                        nodesList.innerHTML = '<div class="text-sm text-gray-500">No nodes registered</div>';
+                    }
+                })
+                .catch(error => {
+                    // It's okay if this endpoint doesn't exist
+                    nodesList.innerHTML = '<div class="text-sm text-gray-500">No nodes registered</div>';
+                });
+        }
+
+        function displayNodes(nodes) {
+            const nodesList = document.getElementById('nodesList');
+            nodesList.innerHTML = '';
+            
+            nodes.forEach(node => {
+                const nodeElement = document.createElement('div');
+                nodeElement.className = 'flex items-center justify-between bg-gray-50 p-2 rounded';
+                
+                nodeElement.innerHTML = `
+                    <div class="flex items-center">
+                        <span class="node-badge w-3 h-3 bg-indigo-500 rounded-full mr-2"></span>
+                        <span class="text-sm font-mono">${node}</span>
+                    </div>
+                    <button class="text-red-500 hover:text-red-700 remove-node" data-node="${node}">
+                        <i class="fas fa-times"></i>
+                    </button>
+                `;
+                
+                nodesList.appendChild(nodeElement);
+            });
+            
+            // Add event listeners to remove buttons
+            document.querySelectorAll('.remove-node').forEach(button => {
+                button.addEventListener('click', function() {
+                    // In a real app, you would have an endpoint to remove nodes
+                    this.parentElement.remove();
+                });
+            });
+        }
+
+        function mineBlock() {
+            // Disable the button and show mining state
+            const mineBtn = document.getElementById('mineBtn');
+            mineBtn.disabled = true;
+            mineBtn.innerHTML = '<i class="fas fa-cog fa-spin mr-2"></i> Mining...';
+            
+            fetch(`${API_URL}/mine`)
+                .then(response => response.json())
+                .then(data => {
+                    // Reload the blockchain to show the new block
+                    loadBlockchain();
+                    
+                    // Reset button
+                    mineBtn.disabled = false;
+                    mineBtn.innerHTML = '<i class="fas fa-hammer mr-2"></i> Mine Block';
+                    
+                    // Show success message
+                    showAlert('New block mined successfully!', 'success');
+                })
+                .catch(error => {
+                    console.error('Error mining block:', error);
+                    mineBtn.disabled = false;
+                    mineBtn.innerHTML = '<i class="fas fa-hammer mr-2"></i> Mine Block';
+                    showAlert('Failed to mine block. See console for details.', 'error');
+                });
+        }
+
+        function resolveChain() {
+            const btn = document.getElementById('resolveChainBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-cog fa-spin mr-2"></i> Resolving...';
+            
+            fetch(`${API_URL}/nodes/resolve`)
+                .then(response => response.json())
+                .then(data => {
+                    // Reload the blockchain
+                    loadBlockchain();
+                    
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-sync-alt mr-2"></i> Resolve Chain';
+                    
+                    if (data.message === 'Our chain was replaced') {
+                        showAlert('Blockchain consensus resolved. Chain was updated.', 'info');
+                    } else {
+                        showAlert('Blockchain consensus resolved. Your chain is authoritative.', 'success');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error resolving chain:', error);
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-sync-alt mr-2"></i> Resolve Chain';
+                    showAlert('Failed to resolve chain. See console for details.', 'error');
+                });
+        }
+
+        function createTransaction(e) {
+            e.preventDefault();
+            
+            const sender = document.getElementById('sender').value;
+            const recipient = document.getElementById('recipient').value;
+            const amount = parseInt(document.getElementById('amount').value);
+            
+            if (!sender || !recipient || isNaN(amount)) {
+                showAlert('Please fill all transaction fields with valid values', 'error');
+                return;
+            }
+            
+            const transactionData = {
+                sender: sender,
+                recipient: recipient,
+                amount: amount
+            };
+            
+            fetch(`${API_URL}/transactions/new`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(transactionData),
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('transactionForm').reset();
+                showAlert(`Transaction created. ${data.message}`, 'success');
+            })
+            .catch(error => {
+                console.error('Error creating transaction:', error);
+                showAlert('Failed to create transaction. See console for details.', 'error');
+            });
+        }
+
+        function registerNode(e) {
+            e.preventDefault();
+            
+            const nodeUrl = document.getElementById('nodeUrl').value;
+            
+            if (!nodeUrl) {
+                showAlert('Please enter a node URL', 'error');
+                return;
+            }
+            
+            const nodeData = {
+                nodes: [nodeUrl]
+            };
+            
+            fetch(`${API_URL}/nodes/register`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(nodeData),
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('nodeUrl').value = '';
+                showAlert(`Node ${nodeUrl} registered successfully`, 'success');
+                
+                // Refresh the nodes list
+                if (data.total_nodes) {
+                    displayNodes(data.total_nodes);
+                }
+            })
+            .catch(error => {
+                console.error('Error registering node:', error);
+                showAlert('Failed to register node. See console for details.', 'error');
+            });
+        }
+
+        // Keep the existing showAlert and createBlockElement functions
+        // Generate a random node identifier for demo purposes
+        document.addEventListener('DOMContentLoaded', function() {
+            const nodeId = 'node-' + Math.random().toString(36).substr(2, 8);
+            document.getElementById('nodeId').textContent = `Node: ${nodeId}`;
+            
+            // Load sample blockchain data
+            loadSampleBlockchain();
+            loadSampleNodes();
+            
+            // Set up event listeners
+            document.getElementById('mineBtn').addEventListener('click', mineBlock);
+            document.getElementById('resolveChainBtn').addEventListener('click', resolveChain);
+            document.getElementById('transactionForm').addEventListener('submit', createTransaction);
+            document.getElementById('nodeForm').addEventListener('submit', registerNode);
+        });
+        
+        function loadSampleBlockchain() {
+            const blockchainContainer = document.getElementById('blockchainContainer');
+            blockchainContainer.innerHTML = '';
+            
+            // Sample blockchain data
+            const blockchain = {
+                chain: [
+                    {
+                        index: 1,
+                        timestamp: Date.now() - 3600000,
+                        transactions: [],
+                        proof: 100,
+                        previous_hash: "1"
+                    },
+                    {
+                        index: 2,
+                        timestamp: Date.now() - 1800000,
+                        transactions: [
+                            {
+                                sender: "0",
+                                recipient: "node-abc123",
+                                amount: 1
+                            }
+                        ],
+                        proof: 35293,
+                        previous_hash: "a1b2c3d4e5f6"
+                    },
+                    {
+                        index: 3,
+                        timestamp: Date.now() - 900000,
+                        transactions: [
+                            {
+                                sender: "node-abc123",
+                                recipient: "node-xyz789",
+                                amount: 1
+                            },
+                            {
+                                sender: "0",
+                                recipient: "node-abc123",
+                                amount: 1
+                            }
+                        ],
+                        proof: 12345,
+                        previous_hash: "f6e5d4c3b2a1"
+                    }
+                ]
+            };
+            
+            // Create blocks
+            blockchain.chain.forEach(block => {
+                const blockElement = createBlockElement(block);
+                blockchainContainer.appendChild(blockElement);
+                
+                // Add connector between blocks (except after last block)
+                if (block.index < blockchain.chain.length) {
+                    const connector = document.createElement('div');
+                    connector.className = 'connector';
+                    blockchainContainer.appendChild(connector);
+                }
+            });
+        }
+        
+        function createBlockElement(block) {
+            const blockElement = document.createElement('div');
+            blockElement.className = 'block bg-white rounded-lg shadow-md p-6 mr-4';
+            
+            blockElement.innerHTML = `
+                <div class="flex justify-between items-start mb-4">
+                    <h3 class="text-lg font-bold text-indigo-600">Block #${block.index}</h3>
+                    <span class="bg-gray-100 text-gray-800 text-xs font-medium px-2.5 py-0.5 rounded">${new Date(block.timestamp).toLocaleTimeString()}</span>
+                </div>
+                
+                <div class="mb-4">
+                    <div class="flex justify-between text-sm text-gray-600 mb-1">
+                        <span>Proof:</span>
+                        <span class="font-mono">${block.proof}</span>
+                    </div>
+                    <div class="flex justify-between text-sm text-gray-600">
+                        <span>Previous Hash:</span>
+                        <span class="font-mono truncate" style="max-width: 150px;">${block.previous_hash}</span>
+                    </div>
+                </div>
+                
+                <div class="border-t border-gray-200 pt-3">
+                    <h4 class="text-sm font-medium text-gray-700 mb-2">Transactions (${block.transactions.length})</h4>
+                    <div class="space-y-2">
+                        ${block.transactions.length > 0 ? 
+                          block.transactions.map(tx => `
+                            <div class="transaction p-2 border border-gray-100 rounded text-xs">
+                                <div class="flex justify-between">
+                                    <span class="font-medium">From:</span>
+                                    <span class="font-mono truncate" style="max-width: 100px;">${tx.sender}</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="font-medium">To:</span>
+                                    <span class="font-mono truncate" style="max-width: 100px;">${tx.recipient}</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="font-medium">Amount:</span>
+                                    <span>${tx.amount}</span>
+                                </div>
+                            </div>
+                          `).join('') : 
+                          '<p class="text-xs text-gray-500 italic">No transactions</p>'
+                        }
+                    </div>
+                </div>
+            `;
+            
+            return blockElement;
+        }
+        
+        function loadSampleNodes() {
+            const nodesList = document.getElementById('nodesList');
+            nodesList.innerHTML = '';
+            
+            const nodes = [
+                'http://node1.example.com:5000',
+                'http://node2.example.com:5000',
+                'http://node3.example.com:5000'
+            ];
+            
+            nodes.forEach(node => {
+                const nodeElement = document.createElement('div');
+                nodeElement.className = 'flex items-center justify-between bg-gray-50 p-2 rounded';
+                
+                nodeElement.innerHTML = `
+                    <div class="flex items-center">
+                        <span class="node-badge w-3 h-3 bg-indigo-500 rounded-full mr-2"></span>
+                        <span class="text-sm font-mono">${node}</span>
+                    </div>
+                    <button class="text-red-500 hover:text-red-700">
+                        <i class="fas fa-times"></i>
+                    </button>
+                `;
+                
+                nodesList.appendChild(nodeElement);
+            });
+        }
+        
+        function mineBlock() {
+            // Simulate mining
+            const mineBtn = document.getElementById('mineBtn');
+            mineBtn.disabled = true;
+            mineBtn.innerHTML = '<i class="fas fa-cog fa-spin mr-2"></i> Mining...';
+            
+            // Simulate API call delay
+            setTimeout(() => {
+                // Create a new block with a random proof
+                const blockchainContainer = document.getElementById('blockchainContainer');
+                const lastBlockIndex = blockchainContainer.querySelectorAll('.block').length;
+                const newProof = Math.floor(Math.random() * 100000);
+                
+                const newBlock = {
+                    index: lastBlockIndex + 1,
+                    timestamp: Date.now(),
+                    transactions: [
+                        {
+                            sender: "0",
+                            recipient: document.getElementById('nodeId').textContent.replace('Node: ', ''),
+                            amount: 1
+                        }
+                    ],
+                    proof: newProof,
+                    previous_hash: "simulated-hash-" + Math.random().toString(36).substr(2, 8)
+                };
+                
+                // Remove the last connector if it exists
+                const lastConnector = blockchainContainer.lastChild;
+                if (lastConnector && lastConnector.classList.contains('connector')) {
+                    blockchainContainer.removeChild(lastConnector);
+                }
+                
+                // Add connector
+                const connector = document.createElement('div');
+                connector.className = 'connector';
+                blockchainContainer.appendChild(connector);
+                
+                // Add new block
+                const blockElement = createBlockElement(newBlock);
+                blockchainContainer.appendChild(blockElement);
+                
+                // Scroll to the end
+                blockchainContainer.scrollLeft = blockchainContainer.scrollWidth;
+                
+                // Reset button
+                mineBtn.disabled = false;
+                mineBtn.innerHTML = '<i class="fas fa-hammer mr-2"></i> Mine Block';
+                
+                // Show success message
+                showAlert('New block mined successfully!', 'success');
+            }, 2000);
+        }
+        
+        function resolveChain() {
+            const btn = document.getElementById('resolveChainBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-cog fa-spin mr-2"></i> Resolving...';
+            
+            // Simulate API call delay
+            setTimeout(() => {
+                // In a real app, this would fetch the longest valid chain from the network
+                // For demo, we'll just reload the sample data
+                loadSampleBlockchain();
+                
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-sync-alt mr-2"></i> Resolve Chain';
+                
+                showAlert('Blockchain consensus resolved. Chain is valid.', 'info');
+            }, 1500);
+        }
+        
+        function createTransaction(e) {
+            e.preventDefault();
+            
+            const sender = document.getElementById('sender').value;
+            const recipient = document.getElementById('recipient').value;
+            const amount = document.getElementById('amount').value;
+            
+            if (!sender || !recipient || !amount) {
+                showAlert('Please fill all transaction fields', 'error');
+                return;
+            }
+            
+            // Simulate API call
+            setTimeout(() => {
+                document.getElementById('transactionForm').reset();
+                showAlert(`Transaction created. It will be included in the next block.`, 'success');
+            }, 1000);
+        }
+        
+        function registerNode(e) {
+            e.preventDefault();
+            
+            const nodeUrl = document.getElementById('nodeUrl').value;
+            
+            if (!nodeUrl) {
+                showAlert('Please enter a node URL', 'error');
+                return;
+            }
+            
+            // Add to the nodes list
+            const nodesList = document.getElementById('nodesList');
+            const nodeElement = document.createElement('div');
+            nodeElement.className = 'flex items-center justify-between bg-gray-50 p-2 rounded';
+            
+            nodeElement.innerHTML = `
+                <div class="flex items-center">
+                    <span class="node-badge w-3 h-3 bg-indigo-500 rounded-full mr-2"></span>
+                    <span class="text-sm font-mono">${nodeUrl}</span>
+                </div>
+                <button class="text-red-500 hover:text-red-700">
+                    <i class="fas fa-times"></i>
+                </button>
+            `;
+            
+            nodesList.appendChild(nodeElement);
+            document.getElementById('nodeUrl').value = '';
+            
+            showAlert(`Node ${nodeUrl} registered successfully`, 'success');
+        }
+        
+        function showAlert(message, type) {
+            const alert = document.createElement('div');
+            alert.className = `fixed top-4 right-4 px-6 py-3 rounded-lg shadow-lg text-white ${
+                type === 'success' ? 'bg-green-500' : 
+                type === 'error' ? 'bg-red-500' : 
+                'bg-blue-500'
+            }`;
+            alert.innerHTML = `
+                <div class="flex items-center">
+                    <i class="fas ${
+                        type === 'success' ? 'fa-check-circle' : 
+                        type === 'error' ? 'fa-exclamation-circle' : 
+                        'fa-info-circle'
+                    } mr-2"></i>
+                    <span>${message}</span>
+                </div>
+            `;
+            
+            document.body.appendChild(alert);
+            
+            setTimeout(() => {
+                alert.style.opacity = '0';
+                alert.style.transition = 'opacity 0.5s ease';
+                setTimeout(() => {
+                    document.body.removeChild(alert);
+                }, 500);
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
